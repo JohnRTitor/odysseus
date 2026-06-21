@@ -1774,17 +1774,26 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             from src.copilot import apply_request_headers
             apply_request_headers(h, messages_copy)
 
-    from src.model_parameters import resolve_and_apply_parameters
+    from src.model_parameters import resolve_and_apply_parameters, resolve_parameters, PARAMETER_DEFINITIONS, get_provider_filter
     payload = resolve_and_apply_parameters(payload, url, model, provider)
 
     # Emit the parameters so they can be logged and displayed in the frontend
-    _safe_params = {k: v for k, v in payload.items() if k not in ("messages", "tools", "stream", "model", "temperature", "max_tokens", "max_completion_tokens")}
+    _safe_params = {}
     if "temperature" in payload:
         _safe_params["temperature"] = payload["temperature"]
     if "max_tokens" in payload:
         _safe_params["max_tokens"] = payload["max_tokens"]
     elif "max_completion_tokens" in payload:
         _safe_params["max_tokens"] = payload["max_completion_tokens"]
+        
+    _user_params = resolve_parameters(url, model) or {}
+    _allowed_keys = {p.name for p in PARAMETER_DEFINITIONS}
+    _filter_cls = get_provider_filter(provider)
+    
+    for k, v in _user_params.items():
+        if k in _allowed_keys and _filter_cls.supports(k, model):
+            _safe_params[k] = v
+
     yield f'data: {json.dumps({"type": "parameters", "data": _safe_params})}\n\n'
 
     # Connect budget from LLMConfig.CONNECT_TIMEOUT (env LLM_CONNECT_TIMEOUT).
