@@ -1762,6 +1762,38 @@ export function displayMetrics(messageElement, metrics) {
       sessionCostStr = `<div><span class="ctx-label">Session</span> $${sc < 0.01 ? sc.toFixed(4) : sc.toFixed(3)}</div>`;
     }
 
+    let paramsStr = '';
+    if (metrics.parameters && Object.keys(metrics.parameters).length > 0) {
+      const p = metrics.parameters;
+      const rows = [];
+      if (p.temperature !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Temp</span> ${p.temperature}`);
+      if (p.top_p !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Top P</span> ${p.top_p}`);
+      if (p.top_k !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Top K</span> ${p.top_k}`);
+      if (p.repeat_penalty !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Rep Pen</span> ${p.repeat_penalty}`);
+      if (p.presence_penalty !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Pres Pen</span> ${p.presence_penalty}`);
+      if (p.frequency_penalty !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Freq Pen</span> ${p.frequency_penalty}`);
+      if (p.seed !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Seed</span> ${p.seed}`);
+      if (p.max_tokens !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Max Tok</span> ${p.max_tokens}`);
+      
+      // Fallback for unknown parameters
+      for (const k in p) {
+        if (!['temperature', 'top_p', 'top_k', 'repeat_penalty', 'presence_penalty', 'frequency_penalty', 'seed', 'max_tokens'].includes(k)) {
+          rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;" title="${k}">${k}</span> ${p[k]}`);
+        }
+      }
+      
+      if (rows.length > 0) {
+        paramsStr = `<details style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);font-size:0.85em;">
+          <summary style="font-weight:600;margin-bottom:4px;color:var(--fg);cursor:pointer;list-style:none;display:flex;align-items:center;gap:4px;">
+            Model Parameters <span style="font-size:0.8em;opacity:0.6;font-weight:normal;">(Click to view)</span>
+          </summary>
+          <div style="margin-top:4px;padding-left:4px;border-left:2px solid var(--border);">
+            ${rows.map(r => `<div>${r}</div>`).join('')}
+          </div>
+        </details>`;
+      }
+    }
+
     const popup = document.createElement('div');
     popup.className = 'ctx-popup';
     popup.innerHTML = `
@@ -1780,6 +1812,7 @@ export function displayMetrics(messageElement, metrics) {
         <div style="font-weight:600;margin-bottom:4px;color:var(--fg);">Agent prep</div>
         ${prepDetails}
       </div>` : ''}
+      ${paramsStr}
       ${ctxPct !== undefined && ctxPct > 0 ? `<div style="margin-top:6px;padding-top:6px;border-top:1px solid var(--border);">
         <span class="ctx-label">Context</span> <span style="color:${ctxColor};font-weight:600;">${ctxPct}%</span> used
       </div>` : ''}

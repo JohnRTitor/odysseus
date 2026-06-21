@@ -1777,6 +1777,16 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
     from src.model_parameters import resolve_and_apply_parameters
     payload = resolve_and_apply_parameters(payload, url, model, provider)
 
+    # Emit the parameters so they can be logged and displayed in the frontend
+    _safe_params = {k: v for k, v in payload.items() if k not in ("messages", "tools", "stream", "model", "temperature", "max_tokens", "max_completion_tokens")}
+    if "temperature" in payload:
+        _safe_params["temperature"] = payload["temperature"]
+    if "max_tokens" in payload:
+        _safe_params["max_tokens"] = payload["max_tokens"]
+    elif "max_completion_tokens" in payload:
+        _safe_params["max_tokens"] = payload["max_completion_tokens"]
+    yield f'data: {json.dumps({"type": "parameters", "data": _safe_params})}\n\n'
+
     # Connect budget from LLMConfig.CONNECT_TIMEOUT (env LLM_CONNECT_TIMEOUT).
     # The dead-host cooldown still bounds a genuinely unreachable upstream, so a
     # wider connect budget only affects first contact and stops a brief cold

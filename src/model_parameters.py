@@ -204,8 +204,17 @@ def resolve_parameters(endpoint_url: str, model_id: str) -> Dict[str, Any]:
     # Override with model-specific params
     db = SessionLocal()
     try:
-        # Match endpoint by base_url
-        ep = db.query(ModelEndpoint).filter(ModelEndpoint.base_url == endpoint_url).first()
+        from src.endpoint_resolver import normalize_base
+        norm_req = normalize_base(endpoint_url)
+        
+        # Match endpoint by normalized base_url
+        endpoints = db.query(ModelEndpoint).all()
+        ep = None
+        for e in endpoints:
+            if e.base_url and normalize_base(e.base_url) == norm_req:
+                ep = e
+                break
+                
         if ep and ep.model_parameters:
             try:
                 params_dict = json.loads(ep.model_parameters)
