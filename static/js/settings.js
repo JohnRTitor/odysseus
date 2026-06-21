@@ -8,6 +8,7 @@ import { clearDockSide } from './modalSnap.js';
 import { sortModelIds } from './modelSort.js';
 import { providerLogo } from './providers.js';
 import { isAltGrEvent } from './platform.js';
+import { showGlobalParamsModal } from './modelParams.js';
 
 let initialized = false;
 let modalEl = null;
@@ -437,6 +438,13 @@ function _bindFallbackWidget(opts) {
     setInitial: function(list) { current = (list || []).slice(); render(); },
     refresh: render,
   };
+}
+
+function initGlobalAiDefaults() {
+  const btn = el('configure-global-ai-defaults');
+  if (btn) btn.addEventListener('click', () => {
+    showGlobalParamsModal();
+  });
 }
 
 /* ── Default Chat Model ── */
@@ -2340,6 +2348,7 @@ function initAll() {
   initOpacityToggle();
   initialized = true;
   initDefaultChat();
+  initGlobalAiDefaults();
   initTeacherModel();
   initUtilityModel();
   initImageSettings();

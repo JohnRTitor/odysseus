@@ -369,6 +369,7 @@ class ModelEndpoint(TimestampMixin, Base):
     hidden_models = Column(Text, nullable=True)    # JSON list of model IDs that failed probing
     cached_models = Column(Text, nullable=True)    # JSON list of last-known model IDs (avoids probe on list)
     pinned_models = Column(Text, nullable=True)    # JSON list of admin-pinned model IDs (manual, may not appear in /v1/models)
+    model_parameters = Column(Text, nullable=True) # JSON dict of inference parameters per model ID
     model_type = Column(String, nullable=True, default="llm")  # "llm" or "image"
     # auto = classify by URL; local = self-hosted server; api/proxy = external
     # OpenAI-compatible API even when reachable through a private/tailnet IP.
@@ -1797,6 +1798,7 @@ def init_db():
     _migrate_add_hidden_models_column()
     _migrate_add_cached_models_column()
     _migrate_add_pinned_models_column()
+    _migrate_add_model_parameters_column()
     _migrate_add_notes_sort_order()
     _migrate_add_model_type_column()
     _migrate_add_model_endpoint_refresh_columns()
@@ -2157,6 +2159,27 @@ def _migrate_add_caldav_sync_columns():
     except Exception as e:
         logging.getLogger(__name__).warning(f"CalDAV sync metadata migration failed: {e}")
 
+def _migrate_add_model_parameters_column():
+    """Add model_parameters column to model_endpoints table."""
+    import sqlite3
+    db_path = DATABASE_URL.replace("sqlite:///", "")
+    if not os.path.exists(db_path):
+        return
+    conn = None
+    try:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.execute("PRAGMA table_info(model_endpoints)")
+        columns = [row[1] for row in cursor.fetchall()]
+        if columns and "model_parameters" not in columns:
+            conn.execute("ALTER TABLE model_endpoints ADD COLUMN model_parameters TEXT")
+            conn.commit()
+    except Exception as e:
+        logging.getLogger(__name__).warning(f"model_endpoints migration failed (model_parameters): {e}")
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
 def _migrate_add_calendar_metadata():
     """Add importance/event_type/last_pinged columns to calendar_events table."""

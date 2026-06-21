@@ -1441,6 +1441,10 @@ def llm_call(url: str, model: str, messages: List[Dict], temperature: float = LL
         if max_tokens and max_tokens > 0:
             tok_key = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
             payload[tok_key] = max_tokens
+            
+    from src.model_parameters import resolve_and_apply_parameters
+    payload = resolve_and_apply_parameters(payload, url, model, provider)
+    
     try:
         note_model_activity(target_url, model)
         r = httpx_post_kimi_aware(target_url, h, json=payload, timeout=timeout)
@@ -1640,6 +1644,9 @@ async def llm_call_async(
             payload["think"] = False
         _apply_local_cache_affinity(payload, url, session_id)
 
+    from src.model_parameters import resolve_and_apply_parameters
+    payload = resolve_and_apply_parameters(payload, url, model, provider)
+
     if _is_host_dead(target_url):
         raise HTTPException(503, f"Upstream {_host_key(target_url)} marked unreachable (cooldown active)")
 
@@ -1766,6 +1773,9 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
         if provider == "copilot":
             from src.copilot import apply_request_headers
             apply_request_headers(h, messages_copy)
+
+    from src.model_parameters import resolve_and_apply_parameters
+    payload = resolve_and_apply_parameters(payload, url, model, provider)
 
     # Connect budget from LLMConfig.CONNECT_TIMEOUT (env LLM_CONNECT_TIMEOUT).
     # The dead-host cooldown still bounds a genuinely unreachable upstream, so a
