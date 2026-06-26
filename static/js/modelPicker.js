@@ -51,19 +51,7 @@ function _toggleFavorite(mid) {
   return i < 0; // true when now favorited
 }
 
-// ── Reasoning Capability Detection ──
-// Matches backend _THINKING_MODEL_PATTERNS and _FIXED_TEMPERATURE_MODELS
-const REASONING_MODELS = [
-  'o1', 'o3', 'o4', 'gpt-5', 
-  'qwen3', 'qwq', 'deepseek-r1', 'deepseek-reasoner', 'minimax',
-  'm2-reap', 'gemma', 'stepfun', 'step-3', 'step3'
-];
 
-export function supportsReasoningEffort(modelId) {
-  if (!modelId) return false;
-  const m = modelId.toLowerCase();
-  return REASONING_MODELS.some(p => m.startsWith(p) || m.includes(`/${p}`) || m.includes(p));
-}
 
 // ── Shared keyboard nav for model pickers ──
 function _handlePickerKeydown(e, listEl, itemSelector, closeFn) {
@@ -779,16 +767,6 @@ export function updateModelPicker() {
   // Toggle reasoning effort button visibility
   const reasoningBtnWrapper = document.getElementById('reasoning-effort-wrapper');
   if (reasoningBtnWrapper) {
-    if (supportsReasoningEffort(modelId)) {
-      reasoningBtnWrapper.style.display = 'inline-block';
-    } else {
-      reasoningBtnWrapper.style.display = 'none';
-      // Auto-hide the popover if open when switching away from reasoning model
-      const menu = document.getElementById('reasoning-effort-menu');
-      if (menu && !menu.classList.contains('hidden')) {
-        menu.classList.add('hidden');
-        document.getElementById('reasoning-effort-btn').classList.remove('active');
-      }
-    }
+    reasoningBtnWrapper.style.display = 'inline-block';
   }
 }
