@@ -850,6 +850,16 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
       if (incognitoChk && incognitoChk.checked) {
         fd.append('incognito', 'true');
       }
+      
+      // Get the checked reasoning effort radio
+      const reasoningEffortInput = document.querySelector('input[name="reasoning-effort"]:checked');
+      if (reasoningEffortInput) {
+        const effort = reasoningEffortInput.value;
+        if (effort !== 'default') {
+          fd.append('reasoning_effort', effort);
+        }
+      }
+      
       const _ws = (Storage.KEYS && Storage.get(Storage.KEYS.WORKSPACE, '')) || '';
       if (_ws) {
         fd.append('workspace', _ws);
@@ -4763,6 +4773,7 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
           session_id: sessionId,
           original_text: oldRaw,
           instruction: instruction,
+          reasoning_effort: document.querySelector('input[name="reasoning-effort"]:checked')?.value === 'default' ? null : document.querySelector('input[name="reasoning-effort"]:checked')?.value
         }),
       });
 

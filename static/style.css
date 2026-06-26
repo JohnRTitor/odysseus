@@ -3117,6 +3117,11 @@ body.bg-pattern-sparkles {
       display: flex;
       align-items: center;
     }
+    .reasoning-effort-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
     .plus-active-dot {
       position: absolute;
       top: 2px;

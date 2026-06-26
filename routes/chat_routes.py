@@ -354,6 +354,7 @@ def setup_chat_routes(
         use_research = chat_request.use_research
         time_filter = chat_request.time_filter
         preset_id = chat_request.preset_id
+        reasoning_effort = chat_request.reasoning_effort
 
         # Verify the caller owns this session before loading it.
         # Without this, any authenticated user can post into another user's chat.
@@ -477,6 +478,7 @@ def setup_chat_routes(
         use_research = form_data.get("use_research")
         time_filter = form_data.get("time_filter")
         preset_id = form_data.get("preset_id")
+        reasoning_effort = form_data.get("reasoning_effort")
         # Issue #3229: API callers send JSON, not FormData.  Read from the
         # JSON body as fallback so callers who send {"allow_bash": true}
         # actually get bash enabled.
@@ -1135,6 +1137,7 @@ def setup_chat_routes(
                         prompt_type=preset_id,
                         tools=None,
                         session_id=session,
+                        reasoning_effort=reasoning_effort,
                     ):
                         if chunk.startswith("data: ") and not chunk.startswith("data: [DONE]"):
                             try:
@@ -1538,6 +1541,7 @@ def setup_chat_routes(
         session_id = body.get("session_id")
         original_text = body.get("original_text", "")
         instruction = body.get("instruction", "")
+        reasoning_effort = body.get("reasoning_effort")
 
         if not session_id or not original_text or not instruction:
             raise HTTPException(400, "session_id, original_text, and instruction are required")
@@ -1576,6 +1580,7 @@ def setup_chat_routes(
                     # on "Rewriting...". Same fix as the chat max_tokens cap.
                     max_tokens=0,
                     tools=None,
+                    reasoning_effort=reasoning_effort,
                 ):
                     if chunk.startswith("data: ") and not chunk.startswith("data: [DONE]"):
                         try:

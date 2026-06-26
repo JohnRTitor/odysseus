@@ -1543,6 +1543,7 @@ async def llm_call_async(
     max_retries: int = LLMConfig.MAX_RETRIES,
     prompt_type: Optional[str] = None,
     session_id: Optional[str] = None,
+    reasoning_effort: Optional[str] = None,
 ) -> str:
     """Asynchronous LLM call using httpx with connection pooling, timeout, retry logic, and performance logging."""
     provider = _detect_provider(url)
@@ -1639,6 +1640,8 @@ async def llm_call_async(
         if max_tokens and max_tokens > 0:
             tok_key = "max_completion_tokens" if _uses_max_completion_tokens(model) else "max_tokens"
             payload[tok_key] = max_tokens
+        if reasoning_effort and provider in ("openai", "openrouter", "ollama"):
+            payload["reasoning_effort"] = reasoning_effort
         # Suppress thinking for qwen3/gemma4 on Ollama /v1 — same as stream_llm.
         if _is_ollama_openai_compat_url(url) and _supports_thinking(model):
             payload["think"] = False
@@ -1703,7 +1706,8 @@ async def llm_call_async(
 async def stream_llm(url: str, model: str, messages: List[Dict], temperature: float = LLMConfig.DEFAULT_TEMPERATURE,
                      max_tokens: int = LLMConfig.DEFAULT_MAX_TOKENS, headers: Optional[Dict] = None,
                      timeout: int = LLMConfig.STREAM_TIMEOUT, prompt_type: Optional[str] = None,
-                     tools: Optional[List[Dict]] = None, session_id: Optional[str] = None):
+                     tools: Optional[List[Dict]] = None, session_id: Optional[str] = None,
+                     reasoning_effort: Optional[str] = None):
     """Stream LLM responses with improved error handling.
 
     Yields SSE chunks:
@@ -1763,6 +1767,8 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             payload[tok_key] = max_tokens
         if tools:
             payload["tools"] = tools
+        if reasoning_effort and provider in ("openai", "openrouter", "ollama"):
+            payload["reasoning_effort"] = reasoning_effort
         # For Ollama's OpenAI-compat /v1 endpoint with thinking models (qwen3,
         # gemma4, etc.), suppress thinking so tool calls aren't swallowed inside
         # <think> blocks. Ollama /v1 accepts "think": false as a top-level param.
@@ -1785,6 +1791,8 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
         _safe_params["max_tokens"] = payload["max_tokens"]
     elif "max_completion_tokens" in payload:
         _safe_params["max_tokens"] = payload["max_completion_tokens"]
+    if "reasoning_effort" in payload:
+        _safe_params["reasoning_effort"] = payload["reasoning_effort"]
         
     _user_params = resolve_parameters(url, model) or {}
     _allowed_keys = {p.name for p in PARAMETER_DEFINITIONS}

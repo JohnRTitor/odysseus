@@ -1805,6 +1805,66 @@ function initializeEventListeners() {
     document.addEventListener('touchend', () => { setTimeout(() => { _refocusOnBlur = false; }, 50); }, { passive: true });
   }
 
+  (function initReasoningEffortMenu() {
+    const reasoningBtn = el('reasoning-effort-btn');
+    const menu = el('reasoning-effort-menu');
+    if (!reasoningBtn || !menu) return;
+
+    reasoningBtn.addEventListener('pointerdown', (e) => { e.preventDefault(); });
+    reasoningBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isOpen = !menu.classList.contains('hidden');
+      if (isOpen) {
+        menu.classList.add('hidden');
+        reasoningBtn.classList.remove('active');
+        const wrapper = el('reasoning-effort-wrapper');
+        if (wrapper) wrapper.appendChild(menu);
+      } else {
+        menu.classList.remove('hidden');
+        reasoningBtn.classList.add('active');
+        
+        // Position menu above button
+        const r = reasoningBtn.getBoundingClientRect();
+        menu.style.left = r.left + 'px';
+        menu.style.right = 'auto';
+        menu.style.bottom = 'auto';
+        menu.style.maxHeight = '';
+        
+        const avail = r.top - 8;
+        const natural = menu.scrollHeight;
+        const h = Math.min(natural, avail);
+        if (natural > avail) {
+          menu.style.maxHeight = avail + 'px';
+          menu.style.overflowY = 'auto';
+        }
+        
+        menu.style.top = (r.top - 8 - h) + 'px';
+        document.body.appendChild(menu);
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!menu.classList.contains('hidden') && !menu.contains(e.target) && !reasoningBtn.contains(e.target)) {
+        menu.classList.add('hidden');
+        reasoningBtn.classList.remove('active');
+        const wrapper = el('reasoning-effort-wrapper');
+        if (wrapper) wrapper.appendChild(menu);
+      }
+    });
+
+    // Close when an option is selected
+    menu.querySelectorAll('input[type="radio"]').forEach(radio => {
+      radio.addEventListener('change', () => {
+        setTimeout(() => {
+          menu.classList.add('hidden');
+          reasoningBtn.classList.remove('active');
+          const wrapper = el('reasoning-effort-wrapper');
+          if (wrapper) wrapper.appendChild(menu);
+        }, 150);
+      });
+    });
+  })();
+
   (function initOverflowMenu() {
     const plusBtn = el('overflow-plus-btn');
     const menu = el('overflow-menu');

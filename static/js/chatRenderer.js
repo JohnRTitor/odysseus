@@ -1774,10 +1774,11 @@ export function displayMetrics(messageElement, metrics) {
       if (p.frequency_penalty !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Freq Pen</span> ${p.frequency_penalty}`);
       if (p.seed !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Seed</span> ${p.seed}`);
       if (p.max_tokens !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Max Tok</span> ${p.max_tokens}`);
+      if (p.reasoning_effort !== undefined) rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;">Effort</span> <span style="text-transform:capitalize;">${p.reasoning_effort}</span>`);
       
       // Fallback for unknown parameters
       for (const k in p) {
-        if (!['temperature', 'top_p', 'top_k', 'repeat_penalty', 'presence_penalty', 'frequency_penalty', 'seed', 'max_tokens'].includes(k)) {
+        if (!['temperature', 'top_p', 'top_k', 'repeat_penalty', 'presence_penalty', 'frequency_penalty', 'seed', 'max_tokens', 'reasoning_effort'].includes(k)) {
           rows.push(`<span class="ctx-label" style="display:inline-block;width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:bottom;" title="${k}">${k}</span> ${p[k]}`);
         }
       }
