@@ -250,3 +250,63 @@ def test_ollama_openai_compat_non_thinking_model_omits_think(monkeypatch):
     )
 
     assert "think" not in payload
+
+
+def test_ollama_payload_maps_inference_parameters():
+    messages = [{"role": "user", "content": "Hi"}]
+    payload = llm_core._build_ollama_payload(
+        "llama3.2",
+        messages,
+        max_tokens=0,
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+        repeat_penalty=1.1,
+        presence_penalty=0.5,
+        frequency_penalty=0.5,
+        seed=42,
+        context_window=8192,
+    )
+    assert payload["options"]["temperature"] == 0.7
+    assert payload["options"]["top_p"] == 0.9
+    assert payload["options"]["top_k"] == 40
+    assert payload["options"]["repeat_penalty"] == 1.1
+    assert payload["options"]["presence_penalty"] == 0.5
+    assert payload["options"]["frequency_penalty"] == 0.5
+    assert payload["options"]["seed"] == 42
+    assert payload["options"]["num_ctx"] == 8192
+
+
+def test_chatgpt_payload_maps_inference_parameters():
+    messages = [{"role": "user", "content": "Hi"}]
+    payload = llm_core._build_chatgpt_responses_payload(
+        "gpt-4o",
+        messages,
+        max_tokens=0,
+        temperature=0.7,
+        top_p=0.9,
+        presence_penalty=0.5,
+        frequency_penalty=0.5,
+        seed=42,
+    )
+    assert payload["temperature"] == 0.7
+    assert payload["top_p"] == 0.9
+    assert payload["presence_penalty"] == 0.5
+    assert payload["frequency_penalty"] == 0.5
+    assert payload["seed"] == 42
+
+
+def test_anthropic_payload_maps_inference_parameters():
+    messages = [{"role": "user", "content": "Hi"}]
+    payload = llm_core._build_anthropic_payload(
+        "claude-3-5-sonnet",
+        messages,
+        max_tokens=0,
+        temperature=0.7,
+        top_p=0.9,
+        top_k=40,
+    )
+    assert payload["temperature"] == 0.7
+    assert payload["top_p"] == 0.9
+    assert payload["top_k"] == 40
+

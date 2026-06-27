@@ -2027,6 +2027,10 @@ import { wireArrowUpRecall, getLastUserMessageFromChatHistory } from './composer
                   continue;
                 }
 
+              } else if (json.type === 'parameters') {
+                if (_isBg) continue;
+                holder._inferenceParameters = json.data;
+
               } else if (json.type === 'message_saved') {
                 // Wire the persisted DB id onto the just-streamed bubble so it
                 // can be edited/deleted immediately, without reloading the chat.

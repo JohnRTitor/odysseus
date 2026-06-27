@@ -2436,6 +2436,140 @@ def setup_model_routes(model_discovery):
         finally:
             db.close()
 
+    @router.get("/model-endpoints/{ep_id}/models/{model_id:path}/parameters")
+    def get_model_parameters_api(ep_id: str, model_id: str, request: Request):
+        require_admin(request)
+        from src.model_parameters import get_model_parameters, get_global_defaults, PARAMETER_DEFINITIONS
+        return {
+            "parameters": get_model_parameters(ep_id, model_id),
+            "schema": {p.name: p.__dict__ for p in PARAMETER_DEFINITIONS},
+            "global_defaults": get_global_defaults()
+        }
+
+    @router.put("/model-endpoints/{ep_id}/models/{model_id:path}/parameters")
+    async def set_model_parameters_api(ep_id: str, model_id: str, request: Request):
+        require_admin(request)
+        from src.model_parameters import set_model_parameters, validate_parameter
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(400, "Body must be a JSON object")
+            
+        # Validate and clean params before saving
+        clean_params = {}
+        for k, v in body.items():
+            val = validate_parameter(k, v)
+            if val is not None and val != "":
+                clean_params[k] = val
+                
+        set_model_parameters(ep_id, model_id, clean_params)
+        return {"success": True, "params": clean_params}
+
+    @router.delete("/model-endpoints/{ep_id}/models/{model_id:path}/parameters")
+    def delete_model_parameters_api(ep_id: str, model_id: str, request: Request):
+        require_admin(request)
+        from src.model_parameters import delete_model_parameters
+        delete_model_parameters(ep_id, model_id)
+        return {"success": True}
+
+    @router.post("/model-endpoints/{ep_id}/models/{model_id:path}/copy-parameters")
+    async def copy_model_parameters_api(ep_id: str, model_id: str, request: Request):
+        require_admin(request)
+        from src.model_parameters import get_model_parameters, set_model_parameters
+        body = await request.json()
+        src_ep = body.get("source_endpoint_id")
+        src_model = body.get("source_model_id")
+        
+        if not src_ep or not src_model:
+            raise HTTPException(400, "source_endpoint_id and source_model_id required")
+            
+        params = get_model_parameters(src_ep, src_model)
+        if params:
+            set_model_parameters(ep_id, model_id, params)
+            return {"success": True, "params": params}
+        return {"success": False, "message": "Source model has no parameters"}
+
+    @router.get("/model-parameters/global-defaults")
+    def get_global_defaults_api(request: Request):
+        require_admin(request)
+        from src.model_parameters import get_global_defaults
+        return get_global_defaults()
+
+    @router.put("/model-parameters/global-defaults")
+    async def set_global_defaults_api(request: Request):
+        require_admin(request)
+        from src.model_parameters import set_global_defaults, validate_parameter
+        body = await request.json()
+        if not isinstance(body, dict):
+            raise HTTPException(400, "Body must be a JSON object")
+            
+        clean_params = {}
+        for k, v in body.items():
+            val = validate_parameter(k, v)
+            if val is not None and val != "":
+                clean_params[k] = val
+                
+        set_global_defaults(clean_params)
+        return {"success": True, "params": clean_params}
+
+    @router.get("/model-parameters/export")
+    def export_model_parameters(request: Request):
+        require_admin(request)
+        from src.model_parameters import get_global_defaults
+        import json
+        db = SessionLocal()
+        try:
+            export_data = {
+                "version": 1,
+                "global_defaults": get_global_defaults(),
+                "endpoints": {}
+            }
+            eps = db.query(ModelEndpoint).filter(ModelEndpoint.model_parameters.isnot(None)).all()
+            for ep in eps:
+                try:
+                    params = json.loads(ep.model_parameters)
+                    if params and isinstance(params, dict):
+                        export_data["endpoints"][ep.id] = params
+                except json.JSONDecodeError:
+                    pass
+            return export_data
+        finally:
+            db.close()
+
+    @router.post("/model-parameters/import")
+    async def import_model_parameters(request: Request):
+        require_admin(request)
+        from src.model_parameters import set_global_defaults
+        import json
+        body = await request.json()
+        
+        if "global_defaults" in body and isinstance(body["global_defaults"], dict):
+            set_global_defaults(body["global_defaults"])
+            
+        if "endpoints" in body and isinstance(body["endpoints"], dict):
+            db = SessionLocal()
+            try:
+                for ep_id, params in body["endpoints"].items():
+                    ep = db.query(ModelEndpoint).filter(ModelEndpoint.id == ep_id).first()
+                    if ep:
+                        # Merge with existing instead of blind overwrite
+                        existing = {}
+                        if ep.model_parameters:
+                            try:
+                                existing = json.loads(ep.model_parameters)
+                            except json.JSONDecodeError:
+                                pass
+                        if not isinstance(existing, dict):
+                            existing = {}
+                            
+                        if isinstance(params, dict):
+                            existing.update(params)
+                            ep.model_parameters = json.dumps(existing)
+                db.commit()
+            finally:
+                db.close()
+                
+        return {"success": True}
+
     # ── Tool management ──
 
     @router.get("/tools")

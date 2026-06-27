@@ -701,10 +701,15 @@ async function loadEndpoints() {
                 <a href="#" data-ep-select-none="${epId}">None</a>
               </span>
             </div>${warningHtml}${showSearch ? `<input type="search" class="mcp-tools-search" placeholder="Search ${sortedModels.length} models..." data-ep-search="${epId}">` : ''}<div class="mcp-tools-list">` + sortedModels.map(m =>
-              `<label title="${esc(m.id)}" data-ep-model-row data-search="${esc((m.display + ' ' + m.id).toLowerCase())}" class="adm-model-row">
-                <input type="checkbox" class="adm-cb-hidden" data-ep-model-id="${esc(m.id)}" ${!m.is_hidden ? 'checked' : ''}>
-                <span class="adm-check-dot" aria-hidden="true"></span>
-                <span>${esc(m.display)}</span>
+              `<label title="${esc(m.id)}" data-ep-model-row data-search="${esc((m.display + ' ' + m.id).toLowerCase())}" class="adm-model-row" style="display:flex;align-items:center;justify-content:space-between;width:100%;">
+                <div style="display:flex;align-items:center;gap:6px;flex:1;overflow:hidden;">
+                  <input type="checkbox" class="adm-cb-hidden" data-ep-model-id="${esc(m.id)}" ${!m.is_hidden ? 'checked' : ''}>
+                  <span class="adm-check-dot" aria-hidden="true"></span>
+                  <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(m.display)}</span>
+                </div>
+                <button type="button" class="adm-model-config-btn" data-ep-id="${esc(epId)}" data-model-id="${esc(m.id)}" title="Configure Inference Parameters" style="background:transparent;border:none;color:var(--fg);opacity:0.3;cursor:pointer;padding:2px;display:flex;align-items:center;justify-content:center;">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
               </label>`
             ).join('') + '</div>';
             const filterRows = (q) => {
@@ -731,6 +736,17 @@ async function loadEndpoints() {
             });
             panel.querySelectorAll('input[type=checkbox]').forEach(cb => {
               cb.addEventListener('change', () => _saveEpModelState(epId, panel));
+            });
+            panel.querySelectorAll('.adm-model-config-btn').forEach(btn => {
+              btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (window.odysseusModelParams) {
+                  window.odysseusModelParams.showModelParams(btn.dataset.epId, btn.dataset.modelId);
+                }
+              });
+              btn.addEventListener('mouseenter', () => btn.style.opacity = '0.9');
+              btn.addEventListener('mouseleave', () => btn.style.opacity = '0.3');
             });
           };
           try {

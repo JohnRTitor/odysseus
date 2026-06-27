@@ -450,6 +450,14 @@ def _build_ollama_payload(
     tools: Optional[List[Dict]] = None,
     num_ctx: Optional[int] = None,
     reasoning_effort: Optional[str] = None,
+    top_p: Optional[float] = None,
+    top_k: Optional[int] = None,
+    repeat_penalty: Optional[float] = None,
+    presence_penalty: Optional[float] = None,
+    frequency_penalty: Optional[float] = None,
+    seed: Optional[int] = None,
+    context_window: Optional[int] = None,
+    system_prompt: Optional[str] = None,
 ) -> Dict:
     """Build the JSON payload for Ollama's /api/chat endpoint.
 
@@ -474,8 +482,32 @@ def _build_ollama_payload(
         options["num_predict"] = max_tokens
     if num_ctx is not None and num_ctx > 0 and num_ctx != DEFAULT_CONTEXT:
         options["num_ctx"] = num_ctx
+    if context_window is not None and context_window > 0:
+        options["num_ctx"] = context_window
+    if top_p is not None:
+        options["top_p"] = top_p
+    if top_k is not None:
+        options["top_k"] = top_k
+    if repeat_penalty is not None:
+        options["repeat_penalty"] = repeat_penalty
+    if presence_penalty is not None:
+        options["presence_penalty"] = presence_penalty
+    if frequency_penalty is not None:
+        options["frequency_penalty"] = frequency_penalty
+    if seed is not None:
+        options["seed"] = seed
+        
     if options:
         payload["options"] = options
+        
+    if system_prompt:
+        # Add system prompt as first message if provided
+        messages_list = payload["messages"]
+        if not messages_list or messages_list[0].get("role") != "system":
+            messages_list.insert(0, {"role": "system", "content": system_prompt})
+        else:
+            messages_list[0]["content"] = system_prompt + "\n\n" + messages_list[0]["content"]
+            
     if tools:
         payload["tools"] = tools
     thinking_enabled = _ollama_think_value(model, reasoning_effort)
@@ -843,6 +875,10 @@ def _build_chatgpt_responses_payload(
     stream: bool = False,
     reasoning_effort: Optional[str] = None,
     verbosity: Optional[str] = None,
+    top_p: Optional[float] = None,
+    presence_penalty: Optional[float] = None,
+    frequency_penalty: Optional[float] = None,
+    seed: Optional[int] = None,
 ) -> Dict:
     from src.chatgpt_subscription import build_responses_input
 
@@ -856,6 +892,14 @@ def _build_chatgpt_responses_payload(
     }
     if not _restricts_temperature(model):
         payload["temperature"] = temperature
+    if top_p is not None:
+        payload["top_p"] = top_p
+    if presence_penalty is not None:
+        payload["presence_penalty"] = presence_penalty
+    if frequency_penalty is not None:
+        payload["frequency_penalty"] = frequency_penalty
+    if seed is not None:
+        payload["seed"] = seed
     normalized_effort = _openai_reasoning_effort_value(model, reasoning_effort)
     if normalized_effort:
         payload["reasoning"] = {"effort": normalized_effort}
@@ -1180,7 +1224,17 @@ def _convert_openai_content_to_anthropic(content):
     return converted
 
 
-def _build_anthropic_payload(model, messages, temperature, max_tokens, stream=False, tools=None):
+def _build_anthropic_payload(
+    model: str,
+    messages: List[Dict],
+    temperature: float,
+    max_tokens: int,
+    stream: bool = False,
+    tools: Optional[List[Dict]] = None,
+    top_p: Optional[float] = None,
+    top_k: Optional[int] = None,
+    **kwargs
+):
     """Convert OpenAI-style messages to Anthropic format."""
     system_parts = []
     chat_messages = []
@@ -1231,6 +1285,10 @@ def _build_anthropic_payload(model, messages, temperature, max_tokens, stream=Fa
         "messages": chat_messages,
         "max_tokens": max_tokens if max_tokens and max_tokens > 0 else 4096,
     }
+    if top_p is not None:
+        payload["top_p"] = top_p
+    if top_k is not None:
+        payload["top_k"] = top_k
     # Opus 4.7+ removed the sampling parameters — sending `temperature` (even 0.0)
     # returns HTTP 400. Omit it for those models; older Claude models still take it.
     if not _anthropic_rejects_temperature(model):
@@ -1627,6 +1685,24 @@ def llm_call(url: str, model: str, messages: List[Dict], temperature: float = LL
     else:
         messages_copy = non_sys
 
+    from src.model_parameters import resolve_parameters
+    params = resolve_parameters(url, model)
+    _t = params.get("temperature")
+    if temperature == LLMConfig.DEFAULT_TEMPERATURE and _t is not None:
+        temperature = _t
+    _m = params.get("max_tokens")
+    if max_tokens == LLMConfig.DEFAULT_MAX_TOKENS and _m is not None:
+        max_tokens = _m
+        
+    top_p = params.get("top_p")
+    top_k = params.get("top_k")
+    repeat_penalty = params.get("repeat_penalty")
+    presence_penalty = params.get("presence_penalty")
+    frequency_penalty = params.get("frequency_penalty")
+    seed = params.get("seed")
+    context_window = params.get("context_window")
+    system_prompt = params.get("system_prompt")
+
     provider = _detect_provider(url)
     cache_key = _get_cache_key(url, model, messages_copy, temperature, max_tokens)
     cached_response = _get_cached_response(cache_key)
@@ -1637,12 +1713,16 @@ def llm_call(url: str, model: str, messages: List[Dict], temperature: float = LL
     if provider == "anthropic":
         target_url = _normalize_anthropic_url(url)
         h = _build_anthropic_headers(headers)
-        payload = _build_anthropic_payload(model, messages_copy, temperature, max_tokens)
+        payload = _build_anthropic_payload(model, messages_copy, temperature, max_tokens,
+                                           top_p=top_p, top_k=top_k)
     elif provider == "ollama":
         target_url = _normalize_ollama_url(url)
         payload = _build_ollama_payload(
             model, messages_copy, temperature, max_tokens,
             stream=False, num_ctx=get_context_length(url, model),
+            top_p=top_p, top_k=top_k, repeat_penalty=repeat_penalty,
+            presence_penalty=presence_penalty, frequency_penalty=frequency_penalty,
+            seed=seed, context_window=context_window, system_prompt=system_prompt,
         )
     else:
         target_url = url
@@ -1654,6 +1734,18 @@ def llm_call(url: str, model: str, messages: List[Dict], temperature: float = LL
             "messages": messages_copy,
             "temperature": temperature,
         }
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if top_k is not None:
+            payload["top_k"] = top_k
+        if repeat_penalty is not None:
+            payload["repeat_penalty"] = repeat_penalty
+        if presence_penalty is not None:
+            payload["presence_penalty"] = presence_penalty
+        if frequency_penalty is not None:
+            payload["frequency_penalty"] = frequency_penalty
+        if seed is not None:
+            payload["seed"] = seed
         if _omit_temperature(provider, model):
             payload.pop("temperature", None)
         if max_tokens and max_tokens > 0:
@@ -1661,6 +1753,10 @@ def llm_call(url: str, model: str, messages: List[Dict], temperature: float = LL
             payload[tok_key] = max_tokens
         if provider == "mistral" and _supports_thinking(model):
             payload["reasoning_effort"] = _MISTRAL_REASONING_EFFORT
+            
+    from src.model_parameters import resolve_and_apply_parameters
+    payload = resolve_and_apply_parameters(payload, url, model, provider)
+
     try:
         note_model_activity(target_url, model)
         r = httpx_post_kimi_aware(target_url, h, json=payload, timeout=timeout)
@@ -1786,6 +1882,24 @@ async def llm_call_async(
     else:
         messages_copy = non_sys
 
+    from src.model_parameters import resolve_parameters
+    params = resolve_parameters(url, model)
+    _t = params.get("temperature")
+    if temperature == LLMConfig.DEFAULT_TEMPERATURE and _t is not None:
+        temperature = _t
+    _m = params.get("max_tokens")
+    if max_tokens == LLMConfig.DEFAULT_MAX_TOKENS and _m is not None:
+        max_tokens = _m
+        
+    top_p = params.get("top_p")
+    top_k = params.get("top_k")
+    repeat_penalty = params.get("repeat_penalty")
+    presence_penalty = params.get("presence_penalty")
+    frequency_penalty = params.get("frequency_penalty")
+    seed = params.get("seed")
+    context_window = params.get("context_window")
+    system_prompt = params.get("system_prompt")
+
     cache_key = _get_cache_key(url, model, messages_copy, temperature, max_tokens)
     cached_response = _get_cached_response(cache_key)
     if cached_response:
@@ -1871,6 +1985,9 @@ async def llm_call_async(
             payload["reasoning_effort"] = _MISTRAL_REASONING_EFFORT
         _apply_local_cache_affinity(payload, url, session_id)
 
+    from src.model_parameters import resolve_and_apply_parameters
+    payload = resolve_and_apply_parameters(payload, url, model, provider)
+
     if _is_host_dead(target_url):
         raise HTTPException(503, f"Upstream {_host_key(target_url)} marked unreachable (cooldown active)")
 
@@ -1954,10 +2071,29 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
     else:
         messages_copy = non_sys
 
+    from src.model_parameters import resolve_parameters
+    params = resolve_parameters(url, model)
+    _t = params.get("temperature")
+    if temperature == LLMConfig.DEFAULT_TEMPERATURE and _t is not None:
+        temperature = _t
+    _m = params.get("max_tokens")
+    if max_tokens == LLMConfig.DEFAULT_MAX_TOKENS and _m is not None:
+        max_tokens = _m
+        
+    top_p = params.get("top_p")
+    top_k = params.get("top_k")
+    repeat_penalty = params.get("repeat_penalty")
+    presence_penalty = params.get("presence_penalty")
+    frequency_penalty = params.get("frequency_penalty")
+    seed = params.get("seed")
+    context_window = params.get("context_window")
+    system_prompt = params.get("system_prompt")
+
     if provider == "anthropic":
         target_url = _normalize_anthropic_url(url)
         h = _build_anthropic_headers(headers)
-        payload = _build_anthropic_payload(model, messages_copy, temperature, max_tokens, stream=True, tools=tools)
+        payload = _build_anthropic_payload(model, messages_copy, temperature, max_tokens, stream=True, tools=tools,
+                                           top_p=top_p, top_k=top_k)
     elif provider == "ollama":
         target_url = _normalize_ollama_url(url)
         h = {"Content-Type": "application/json"}
@@ -1967,6 +2103,9 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             model, messages_copy, temperature, max_tokens,
             stream=True, tools=tools, num_ctx=get_context_length(url, model),
             reasoning_effort=reasoning_effort,
+            top_p=top_p, top_k=top_k, repeat_penalty=repeat_penalty,
+            presence_penalty=presence_penalty, frequency_penalty=frequency_penalty,
+            seed=seed, context_window=context_window, system_prompt=system_prompt,
         )
     elif provider == "chatgpt-subscription":
         target_url = _normalize_chatgpt_subscription_url(url)
@@ -1979,6 +2118,8 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             stream=True,
             reasoning_effort=reasoning_effort,
             verbosity=verbosity,
+            top_p=top_p, presence_penalty=presence_penalty,
+            frequency_penalty=frequency_penalty, seed=seed,
         )
     else:
         target_url = url
@@ -1988,6 +2129,18 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             "temperature": temperature,
             "stream": True,
         }
+        if top_p is not None:
+            payload["top_p"] = top_p
+        if top_k is not None:
+            payload["top_k"] = top_k
+        if repeat_penalty is not None:
+            payload["repeat_penalty"] = repeat_penalty
+        if presence_penalty is not None:
+            payload["presence_penalty"] = presence_penalty
+        if frequency_penalty is not None:
+            payload["frequency_penalty"] = frequency_penalty
+        if seed is not None:
+            payload["seed"] = seed
         if _omit_temperature(provider, model):
             payload.pop("temperature", None)
         if provider not in {"openrouter", "groq"}:
@@ -2022,10 +2175,32 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
     # path, which -- unlike llm_call -- does not retry the connect.
     stream_timeout = _stream_timeout(timeout)
 
+    from src.model_parameters import resolve_and_apply_parameters, resolve_parameters, PARAMETER_DEFINITIONS, get_provider_filter
+    payload = resolve_and_apply_parameters(payload, url, model, provider)
+
     if _is_host_dead(target_url):
         yield f'event: error\ndata: {json.dumps({"error": f"Upstream {_host_key(target_url)} unreachable (cooldown active)", "status": 503})}\n\n'
         return
     note_model_activity(target_url, model)
+
+    # Emit the parameters so they can be logged and displayed in the frontend
+    _safe_params = {}
+    if "temperature" in payload:
+        _safe_params["temperature"] = payload["temperature"]
+    if "max_tokens" in payload:
+        _safe_params["max_tokens"] = payload["max_tokens"]
+    elif "max_completion_tokens" in payload:
+        _safe_params["max_tokens"] = payload["max_completion_tokens"]
+        
+    _user_params = resolve_parameters(url, model) or {}
+    _allowed_keys = {p.name for p in PARAMETER_DEFINITIONS}
+    _filter_cls = get_provider_filter(provider)
+    
+    for k, v in _user_params.items():
+        if k in _allowed_keys and _filter_cls.supports(k, model):
+            _safe_params[k] = v
+
+    yield f'data: {json.dumps({"type": "parameters", "data": _safe_params})}\n\n'
 
     # ── ChatGPT Subscription / Codex Responses streaming ──
     if provider == "chatgpt-subscription":

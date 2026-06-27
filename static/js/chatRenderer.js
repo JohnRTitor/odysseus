@@ -1823,6 +1823,33 @@ export function displayMetrics(messageElement, metrics) {
       ${isReal ? '' : '<div style="margin-top:4px;font-size:0.8em;opacity:0.4;">~ estimated token count</div>'}
     `;
 
+    // Render parameters if present
+    let paramsHtml = '';
+    const _params = metrics.parameters || messageElement._inferenceParameters;
+    if (_params && Object.keys(_params).length > 0) {
+      paramsHtml = `
+      <details style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border);font-size:0.85em;">
+        <summary style="font-weight:600;color:var(--fg);cursor:pointer;user-select:none;">Model Parameters <span style="font-size:0.8em;opacity:0.6;font-weight:normal;margin-left:4px;">(Click to view)</span></summary>
+        <div style="margin-top:6px;padding-left:4px;">`;
+      
+      const pLabels = {
+        temperature: "Temp", top_p: "Top P", top_k: "Top K", max_tokens: "Max Tok",
+        repeat_penalty: "Rep Pen", presence_penalty: "Pres Pen", frequency_penalty: "Freq Pen",
+        seed: "Seed", context_window: "Ctx Win"
+      };
+
+      for (const [k, v] of Object.entries(_params)) {
+        const label = pLabels[k] || k.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
+        paramsHtml += `<div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+                         <span class="ctx-label" style="opacity:0.8;">${label}</span>
+                         <span style="font-family:var(--font-mono, monospace);">${v}</span>
+                       </div>`;
+      }
+      paramsHtml += `</div></details>`;
+      popup.innerHTML += paramsHtml;
+    }
+
+
     const rect = metricsContainer.getBoundingClientRect();
     popup.style.left = rect.left + 'px';
     popup.style.visibility = 'hidden';

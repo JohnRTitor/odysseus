@@ -1071,6 +1071,7 @@ def setup_chat_routes(
 
             full_response = ""
             last_metrics = None
+            last_parameters = None
 
             # Configured fallback chain for the default chat model. Tried in
             # order if the session's primary model fails before producing
@@ -1176,6 +1177,9 @@ def setup_chat_routes(
                                     _actual_model = data.get("model") or _actual_model
                                     data["requested_model"] = _requested_model
                                     yield f'data: {json.dumps(data)}\n\n'
+                                elif data.get("type") == "parameters":
+                                    last_parameters = data.get("data", {})
+                                    yield chunk
                                 elif data.get("type") == "usage":
                                     last_metrics = data.get("data", {})
                                     _reported_model = last_metrics.get("model")
@@ -1192,9 +1196,9 @@ def setup_chat_routes(
                                     if last_metrics.get("gen_tps") and not last_metrics.get("tokens_per_second"):
                                         last_metrics["tokens_per_second"] = last_metrics["gen_tps"]
                                         last_metrics["tps_source"] = "backend"
-                                    # Wall-clock response time for the stats popup ("Time").
                                     last_metrics.setdefault("response_time", round(time.time() - _chat_start, 2))
                                     last_metrics = _stamp_requested_model_controls(last_metrics)
+                                    if last_parameters: last_metrics["parameters"] = last_parameters
                                     yield f'data: {json.dumps({"type": "metrics", "data": last_metrics})}\n\n'
                             except json.JSONDecodeError:
                                 yield chunk
@@ -1223,6 +1227,7 @@ def setup_chat_routes(
                                     "usage_source": "estimated",
                                 }
                                 last_metrics = _stamp_requested_model_controls(last_metrics)
+                                if last_parameters: last_metrics["parameters"] = last_parameters
                                 yield f'data: {json.dumps({"type": "metrics", "data": last_metrics})}\n\n'
                             if full_response:
                                 last_metrics = _stamp_requested_model_controls(last_metrics)
@@ -1353,12 +1358,16 @@ def setup_chat_routes(
                                     _actual_model = data.get("model") or _actual_model
                                     data["requested_model"] = _requested_model
                                     yield f'data: {json.dumps(data)}\n\n'
+                                elif data.get("type") == "parameters":
+                                    last_parameters = data.get("data", {})
+                                    yield chunk
                                 elif data.get("type") == "metrics":
                                     last_metrics = data.get("data", {})
                                     _reported_model = last_metrics.get("model")
                                     last_metrics["requested_model"] = last_metrics.get("requested_model") or _requested_model
                                     last_metrics["model"] = _reported_model or _actual_model or _answered_by or _requested_model
                                     last_metrics = _stamp_requested_model_controls(last_metrics)
+                                    if last_parameters: last_metrics["parameters"] = last_parameters
                                     yield f'data: {json.dumps({"type": "metrics", "data": last_metrics})}\n\n'
                             except json.JSONDecodeError:
                                 yield chunk

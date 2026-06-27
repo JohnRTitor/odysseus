@@ -627,6 +627,15 @@ async function initDefaultChat() {
     saveDefault();
   });
 
+  var globalParamsBtn = el('set-configureGlobalParamsBtn');
+  if (globalParamsBtn) {
+    globalParamsBtn.addEventListener('click', function() {
+      if (window.odysseusModelParams) {
+        window.odysseusModelParams.showGlobalDefaults();
+      }
+    });
+  }
+
   _registerAiEndpointRefresh(function(endpoints) {
     _endpoints = endpoints;
     refreshEndpointOptions(epSel.value, modelSel.value);
