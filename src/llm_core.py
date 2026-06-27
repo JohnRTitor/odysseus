@@ -1118,14 +1118,12 @@ def _supports_openai_none_reasoning(model: str) -> bool:
 
 
 def _openai_reasoning_effort_value(model: str, reasoning_effort: Optional[str]) -> Optional[str]:
-    if not _supports_openai_reasoning_effort(model):
-        return None
     effort = _normalize_reasoning_effort(reasoning_effort)
     if effort in _OPENAI_REASONING_EFFORTS:
         return effort
-    if effort == "minimal" and _supports_openai_minimal_reasoning(model):
+    if effort == "minimal":
         return effort
-    if effort in {"off", "none"} and _supports_openai_none_reasoning(model):
+    if effort in {"off", "none"}:
         return "none"
     return None
 
@@ -2141,6 +2139,11 @@ async def stream_llm(url: str, model: str, messages: List[Dict], temperature: fl
             payload["frequency_penalty"] = frequency_penalty
         if seed is not None:
             payload["seed"] = seed
+            
+        normalized_effort = _openai_reasoning_effort_value(model, reasoning_effort)
+        if normalized_effort:
+            payload["reasoning_effort"] = normalized_effort
+            
         if _omit_temperature(provider, model):
             payload.pop("temperature", None)
         if provider not in {"openrouter", "groq"}:
